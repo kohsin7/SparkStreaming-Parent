@@ -5,6 +5,14 @@ import io.searchbox.client.config.HttpClientConfig
 import io.searchbox.core.{Get, Index, Search, SearchResult}
 import java.util
 
+import org.apache.lucene.search.Query
+import org.elasticsearch.common.io.stream.StreamOutput
+import org.elasticsearch.common.xcontent.{ToXContent, XContentBuilder}
+import org.elasticsearch.index.query.{BoolQueryBuilder, MatchQueryBuilder, QueryBuilder, QueryShardContext, TermQueryBuilder}
+import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder
+import org.elasticsearch.search.sort.SortOrder
+
 object MyESUtil {
 
   private var jestFactory: JestClientFactory = null
@@ -86,10 +94,43 @@ object MyESUtil {
   }
 
   // 根据指定查询条件，从 es 中查询多个文档 方法一
-  def queryIndexByCondition(): Unit = {
+  def queryIndexByCondition1(): Unit = {
     val jestClient = getJestClient()
 
-    var query: String = ""
+    var query: String =
+      """
+        |
+        |""".stripMargin
+    val search = new Search.Builder(query)
+      .addIndex("move_index_1")
+      .build()
+    val result = jestClient.execute(search)
+    val list: util.List[SearchResult#Hit[util.Map[String, Any], Void]] = result.getHits(classOf[util.Map[String, Any]])
+    import scala.collection.JavaConverters._
+    val resultList: List[util.Map[String, Any]] = list.asScala.map(_.source).toList
+
+    println(resultList.mkString("\n"))
+
+    jestClient.close()
+  }
+
+  def queryIndexByCondition2(): Unit = {
+    val jestClient = getJestClient()
+
+    //SearchSourceBuilder 用于构建查询 json 格式字符串
+    val sourceBuilder = new SearchSourceBuilder()
+    val boolQueryBuilder = new BoolQueryBuilder()
+    boolQueryBuilder.must(new MatchQueryBuilder("name", "tianlong"))
+    boolQueryBuilder.filter(new TermQueryBuilder("actorList.name.keyword", ""))
+
+    sourceBuilder.query(boolQueryBuilder)
+    sourceBuilder.from(0)
+    sourceBuilder.size(10)
+    sourceBuilder.sort("doubanScore", SortOrder.ASC)
+    sourceBuilder.highlighter(new HighlightBuilder().field("name"))
+
+    val query: String = sourceBuilder.toString
+
     val search = new Search.Builder(query)
       .addIndex("move_index_1")
       .build()
@@ -109,6 +150,5 @@ object MyESUtil {
 }
 
 
-case class Movie(id: Long, name: String, doubanScore: Float, actorList: util.List[util.Map[String, Object]]) {
+case class Movie(id: Long, name: String, doubanScore: Float, actorList: util.List[util.Map[String, Object]]) {}
 
-}

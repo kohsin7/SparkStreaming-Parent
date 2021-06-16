@@ -27,7 +27,7 @@ public class LoggerController {
     //提供一个方法，处理模拟器生成的数据
     //@RequestMapping("/applog")  把applog请求，交给方法进行处理
     //@RequestBody   表示从请求体中获取数据
-    @RequestMapping("/applog")
+    @RequestMapping("/sparkapplog")
     //在模拟数据生成的代码中，我们将数据封装为 json，通过post传递给该Controller处理，所以我们通过@RequestBody 接收
     public String applog(@RequestBody String mockLog) {
         //System.out.println(mockLog);
