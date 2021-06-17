@@ -5,9 +5,6 @@ import io.searchbox.client.config.HttpClientConfig
 import io.searchbox.core.{Get, Index, Search, SearchResult}
 import java.util
 
-import org.apache.lucene.search.Query
-import org.elasticsearch.common.io.stream.StreamOutput
-import org.elasticsearch.common.xcontent.{ToXContent, XContentBuilder}
 import org.elasticsearch.index.query.{BoolQueryBuilder, MatchQueryBuilder, QueryBuilder, QueryShardContext, TermQueryBuilder}
 import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder
