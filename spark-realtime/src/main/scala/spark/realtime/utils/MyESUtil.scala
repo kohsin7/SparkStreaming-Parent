@@ -65,7 +65,7 @@ object MyESUtil {
 
     var actorList: util.ArrayList[util.Map[String, Object]] = new util.ArrayList[util.Map[String, Object]]()
     var actorMap1 = new util.HashMap[String, Object]()
-    actorMap1.put("id", 66)
+    actorMap1.put("id", "66")
     actorMap1.put("name", "wangyuyan")
     actorList.add(actorMap1)
 
