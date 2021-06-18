@@ -10,7 +10,8 @@ import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import redis.clients.jedis.Jedis
-import spark.realtime.utils.{MyKafkaUtil, MyRedisUtil}
+import spark.realtime.bean.DauInfo
+import spark.realtime.utils.{MyESUtil, MyKafkaUtil, MyRedisUtil}
 
 import scala.collection.mutable.ListBuffer
 
@@ -83,7 +84,7 @@ object DauApp {
     // 方案2
     // todo 以分区为单位，在每个分区中获取一次 redis 连接
     // todo 可选算子 mappartition / foreachrdd（行动算子，触发行动操作，相当于作业要提交。并不是以分区为单位进行的，foreachpartition才是。）
-    val filteredDStream:DStream[JSONObject] = jsonObjectDStream.mapPartitions(
+    val filteredDStream: DStream[JSONObject] = jsonObjectDStream.mapPartitions(
       jsonObjIter => { //以分区为单位对数据进行处理
         val jedis: Jedis = MyRedisUtil.getJedisClient()
         //定义一个集合，用于存放当前分区中第一次的登录的日志
@@ -116,8 +117,42 @@ object DauApp {
         filteredList.toIterator
       }
     )
+    //filteredDStream.count().print()
 
-    filteredDStream.count().print()
+    //将数据批量保存到 ES 中
+    filteredDStream.foreachRDD(
+      rdd => {
+        // todo 根数据库打交道，最好用分区算子来做
+        // mapPartition 是做转换，最终需要返回一个可迭代的集合
+        // foreachPartition 可以直接保存，无返回值
+        rdd.foreachPartition(
+          jsonObjItr => {
+            val dauInfList: List[DauInfo] = jsonObjItr.map(
+              jsonObj => {
+                //每次处理的是一个 json 对象 将 json 对象封装为样例类
+                val commonJsonObj: JSONObject = jsonObj.getJSONObject("common")
+                DauInfo(
+                  commonJsonObj.getString("mid"),
+                  commonJsonObj.getString("uid"),
+                  commonJsonObj.getString("ar"),
+                  commonJsonObj.getString("ch"),
+                  commonJsonObj.getString("vc"),
+                  jsonObj.getString("dt"),
+                  jsonObj.getString("hr"),
+                  "00", //分钟我们前面没有转换，默认 00
+                  jsonObj.getLongValue("ts")
+                )
+              }
+            ).toList
+            //对分区的数据进行批量处理
+            //获取当前日志字符串
+            val dt: String = new SimpleDateFormat("yyyy-MM-dd").format(new Date())
+            MyESUtil.bulkInsert(dauInfList, "gmall2020_dau_info_" + dt)
+          }
+        )
+      }
+    )
+
 
     ssc.start()
     ssc.awaitTermination()
