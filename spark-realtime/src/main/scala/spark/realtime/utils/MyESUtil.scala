@@ -1,14 +1,15 @@
 package spark.realtime.utils
 
-import io.searchbox.client.{JestClient, JestClientFactory}
-import io.searchbox.client.config.HttpClientConfig
-import io.searchbox.core.{Get, Index, Search, SearchResult}
 import java.util
 
-import org.elasticsearch.index.query.{BoolQueryBuilder, MatchQueryBuilder, QueryBuilder, QueryShardContext, TermQueryBuilder}
+import io.searchbox.client.config.HttpClientConfig
+import io.searchbox.client.{JestClient, JestClientFactory}
+import io.searchbox.core._
+import org.elasticsearch.index.query.{BoolQueryBuilder, MatchQueryBuilder, TermQueryBuilder}
 import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder
 import org.elasticsearch.search.sort.SortOrder
+import spark.realtime.bean.DauInfo
 
 object MyESUtil {
 
@@ -143,6 +144,33 @@ object MyESUtil {
 
   def main(args: Array[String]): Unit = {
     putIndex1()
+  }
+
+  /**
+   * 向 ES 中批量插入数据
+   *
+   * @param dataInfoList
+   * @param indexName
+   */
+  def bulkInsert(dataInfoList: List[DauInfo], indexName: String): Unit = {
+    if (dataInfoList != null && dataInfoList.size != 0) {
+
+      val jestClient = getJestClient()
+      val bulkBuilder: Bulk.Builder = new Bulk.Builder
+
+      for (dauInfo <- dataInfoList) {
+        val index: Index = new Index.Builder(dauInfo)
+          .index(indexName)
+          .build()
+        bulkBuilder.addAction(index)
+      }
+
+      val bulk: Bulk = bulkBuilder.build()
+      val bulkResult: BulkResult = jestClient.execute(bulk)
+      println("向 ES 中插入了" + bulkResult.getItems.size() + "条数据")
+
+      jestClient.close()
+    }
   }
 }
 

@@ -119,6 +119,8 @@ object DauApp {
     )
     //filteredDStream.count().print()
 
+    // todo transform 和 foreachRDD在 Driver 中执行
+    // todo RDD相关的算子的代码在 executor 中执行，算子之外的代码在 driver 中执行
     //将数据批量保存到 ES 中
     filteredDStream.foreachRDD(
       rdd => {
@@ -147,7 +149,7 @@ object DauApp {
             //对分区的数据进行批量处理
             //获取当前日志字符串
             val dt: String = new SimpleDateFormat("yyyy-MM-dd").format(new Date())
-            MyESUtil.bulkInsert(dauInfList, "gmall2020_dau_info_" + dt)
+            MyESUtil.bulkInsert(dauInfList, "spark_dau_info_" + dt)
           }
         )
       }
