@@ -6,12 +6,13 @@ import java.util.Date
 
 import com.alibaba.fastjson.{JSON, JSONObject}
 import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import redis.clients.jedis.Jedis
 import spark.realtime.bean.DauInfo
-import spark.realtime.utils.{MyESUtil, MyKafkaUtil, MyRedisUtil}
+import spark.realtime.utils.{MyESUtil, MyKafkaUtil, MyRedisUtil, OffsetManagerUtil}
 
 import scala.collection.mutable.ListBuffer
 
@@ -26,11 +27,22 @@ object DauApp {
 
     var topic: String = "spark_start_logger"
     var groupId: String = "spark_dau_logger"
-    val kafkaDSream: InputDStream[ConsumerRecord[String, String]] = MyKafkaUtil.getKafkaStream(topic, ssc, groupId)
+
+    var recordDStream: InputDStream[ConsumerRecord[String, String]] = null;
+    // 从 Redis 中获取 Kafka 分区偏移量
+    val offsetMap: Map[TopicPartition, Long] = OffsetManagerUtil.getOffset(topic, groupId)
+    if (offsetMap != null && offsetMap.size > 0) {
+      // 如果有，从 offset 开始消费
+      recordDStream = MyKafkaUtil.getKafkaStream(topic, ssc, offsetMap, groupId)
+    } else {
+      // 如果没有，从最新的 开始消费
+      recordDStream = MyKafkaUtil.getKafkaStream(topic, ssc, groupId)
+    }
+
     //    val jsonDStream: DStream[String] = kafkaDSream.map(_.value())
     //    jsonDStream.print()
 
-    val jsonObjectDStream: DStream[JSONObject] = kafkaDSream.map {
+    val jsonObjectDStream: DStream[JSONObject] = recordDStream.map {
       record => {
         val jsonString: String = record.value()
         val jsonObject: JSONObject = JSON.parseObject(jsonString)
