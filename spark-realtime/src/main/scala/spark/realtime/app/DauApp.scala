@@ -9,6 +9,7 @@ import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.TopicPartition
 import org.apache.spark.SparkConf
 import org.apache.spark.streaming.dstream.{DStream, InputDStream}
+import org.apache.spark.streaming.kafka010.{HasOffsetRanges, OffsetRange}
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import redis.clients.jedis.Jedis
 import spark.realtime.bean.DauInfo
@@ -39,10 +40,21 @@ object DauApp {
       recordDStream = MyKafkaUtil.getKafkaStream(topic, ssc, groupId)
     }
 
+    // 获取当前采集周期从 kafka 中消费的数据的起始偏移量以及结束的偏移量
+    var offsetRanges: Array[OffsetRange] = Array.empty
+    val offsetDStream: DStream[ConsumerRecord[String, String]] = recordDStream.transform {
+      rdd => {
+        // 因为 recordDStream 底层封装的是 kafakRdd，混入了 HasOffsetRanges 特质，这个特质中提供了可以获取偏移量范围的方法
+        offsetRanges = rdd.asInstanceOf[HasOffsetRanges].offsetRanges
+        rdd
+      }
+    }
+
+    // 获取当前采集周期从 Kafka 中消费的数据的起始偏移量以及结束偏移量
     //    val jsonDStream: DStream[String] = kafkaDSream.map(_.value())
     //    jsonDStream.print()
 
-    val jsonObjectDStream: DStream[JSONObject] = recordDStream.map {
+    val jsonObjectDStream: DStream[JSONObject] = offsetDStream.map {
       record => {
         val jsonString: String = record.value()
         val jsonObject: JSONObject = JSON.parseObject(jsonString)
