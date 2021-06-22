@@ -152,15 +152,16 @@ object MyESUtil {
    * @param dataInfoList
    * @param indexName
    */
-  def bulkInsert(dataInfoList: List[DauInfo], indexName: String): Unit = {
+  def bulkInsert(dataInfoList: List[(String, DauInfo)], indexName: String): Unit = {
     if (dataInfoList != null && dataInfoList.size != 0) {
 
       val jestClient = getJestClient()
       val bulkBuilder: Bulk.Builder = new Bulk.Builder
 
-      for (dauInfo <- dataInfoList) {
+      for ((id, dauInfo) <- dataInfoList) {
         val index: Index = new Index.Builder(dauInfo)
           .index(indexName)
+          .id(id)
           .build()
         bulkBuilder.addAction(index)
       }

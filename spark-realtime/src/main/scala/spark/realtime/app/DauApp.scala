@@ -146,18 +146,18 @@ object DauApp {
     // todo transform 和 foreachRDD在 Driver 中执行
     // todo RDD相关的算子的代码在 executor 中执行，算子之外的代码在 driver 中执行
     //将数据批量保存到 ES 中
-    filteredDStream.foreachRDD(
+    filteredDStream.foreachRDD {
       rdd => {
         // todo 根数据库打交道，最好用分区算子来做
         // mapPartition 是做转换，最终需要返回一个可迭代的集合
         // foreachPartition 可以直接保存，无返回值
-        rdd.foreachPartition(
+        rdd.foreachPartition {
           jsonObjItr => {
-            val dauInfList: List[DauInfo] = jsonObjItr.map(
+            val dauInfList: List[(String, DauInfo)] = jsonObjItr.map(
               jsonObj => {
                 //每次处理的是一个 json 对象 将 json 对象封装为样例类
                 val commonJsonObj: JSONObject = jsonObj.getJSONObject("common")
-                DauInfo(
+                val dauInfo = DauInfo(
                   commonJsonObj.getString("mid"),
                   commonJsonObj.getString("uid"),
                   commonJsonObj.getString("ar"),
@@ -168,6 +168,7 @@ object DauApp {
                   "00", //分钟我们前面没有转换，默认 00
                   jsonObj.getLongValue("ts")
                 )
+                (dauInfo.mid, dauInfo)
               }
             ).toList
             //对分区的数据进行批量处理
@@ -175,12 +176,15 @@ object DauApp {
             val dt: String = new SimpleDateFormat("yyyy-MM-dd").format(new Date())
             MyESUtil.bulkInsert(dauInfList, "spark_dau_info_" + dt)
           }
-        )
+        }
+        // 提交偏移量到 Rdis 中
+        OffsetManagerUtil.saveOffset(topic, groupId, offsetRanges)
       }
-    )
-
+    }
 
     ssc.start()
     ssc.awaitTermination()
   }
 }
+
+
